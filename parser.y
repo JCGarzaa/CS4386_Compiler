@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "structs.h"
+#include "symbol_table.h"
+
 extern FILE *yyin, *yyout;
 void yyerror(char *s);
 %}
@@ -83,11 +85,23 @@ program:
        ;
 
 declarations:
-            VAR ident AS type SC declarations { struct Declarations* ptr = malloc(sizeof(struct Declarations));
-                                                ptr->ident = $2;
-                                                ptr->type = $4;
-                                                ptr->decl = $6;
-                                                $$ = ptr; }
+            VAR ident AS type SC declarations { 
+                // check if variable declared
+                struct SymbolTableEntry *entry = find_variable($2);
+                if (entry != NULL) {
+                    // variable already declared
+                    fprintf(stderr, "ERROR: Variable '%s' has already been declared\n", $2);
+                    yyerror("ERROR: Variable already declared.");
+                    exit(EXIT_FAILURE);
+                }
+                else {
+                    add_variable($2, $4, 0);
+                }
+                struct Declarations* ptr = malloc(sizeof(struct Declarations));
+                ptr->ident = $2;
+                ptr->type = $4;
+                ptr->decl = $6;
+                $$ = ptr; }
             | /* empty */ { $$ = (struct Declarations*)NULL; }
             ;
 
@@ -125,14 +139,32 @@ statement:
          ;
 
 assignment: 
-          ident ASGN expression { struct Assignment* ptr = malloc(sizeof(struct Assignment));
-                                  ptr->ident = $1;
-                                  ptr->expr = $3;
-                                  $$ = ptr; }
-          | ident ASGN READINT { struct Assignment* ptr = malloc(sizeof(struct Assignment));
-                                 ptr->ident = $1;
-                                 ptr->expr = (struct Expression*)NULL;
-                                 $$ = ptr; }
+          ident ASGN expression { 
+            SymbolTableEntry *entry = find_variable($1);
+            if (!entry) {
+                fprintf(stderr, "ERROR: variable '%s' not declared yet\n", $1);
+                yyerror("ERROR: variable not declared yet");
+                exit(EXIT_FAILURE);
+            }
+            initialize_variable($1);
+            struct Assignment* ptr = malloc(sizeof(struct Assignment));
+            ptr->ident = $1;
+            ptr->expr = $3;
+            $$ = ptr;
+          }
+          | ident ASGN READINT { 
+                SymbolTableEntry *entry = find_variable($1);
+                if (!entry) {
+                    fprintf(stderr, "ERROR: variable '%s' not declared yet\n", $1);
+                    yyerror("ERROR: variable not declared yet");
+                    exit(EXIT_FAILURE);
+                }
+                initialize_variable($1);
+                struct Assignment* ptr = malloc(sizeof(struct Assignment));
+                ptr->ident = $1;
+                ptr->expr = (struct Expression*)NULL;
+                $$ = ptr;
+            }
           ;
 
 ifStatement:
@@ -177,11 +209,8 @@ expression:
           | simpleExpression OP4 simpleExpression { 
                 struct Expression* ptr = malloc(sizeof(struct Expression));
                 ptr->simpleExpr1 = $1;
-                printf("simple expr 1: %s\n", ptr->simpleExpr1);
                 ptr->op4 = $2; // TODO: MAYBE CHANGE THIS
-                printf("op4 %s\n", $2); 
                 ptr->simpleExpr2 = $3;
-                printf ("simple expression 2: %s\n\n", ptr->simpleExpr2); // FIX: remove
                 $$ = ptr; }
           ;
 
@@ -200,9 +229,7 @@ simpleExpression:
 
 term:
     factor OP2 factor { struct Term* ptr = malloc(sizeof(struct Term));
-                        printf("FACTOR IN TERM %s\n", $1);
                         ptr->factor1 = $1;
-                        printf("OP2 %s\n", $2);
                         ptr->op2 = $2; // TODO: MAYBE CHANGE THIS
                         ptr->factor2 = $3; //TODO: check this
                         $$ = ptr; }
@@ -218,9 +245,7 @@ factor:
               ptr->ident = (char*)$1;
               $$ = ptr;}
       | num { struct Factor* ptr = malloc(sizeof(struct Factor));
-                printf("num in factor: %d\n", *($1));
               ptr->num = $1;
-              printf("num in ptr: %d\n", *(ptr->num));
               $$ = ptr;}
       | boollit { struct Factor* ptr = malloc(sizeof(struct Factor));
                   ptr->bool = $1;
@@ -247,19 +272,15 @@ int main() {
 void genFactor(struct Factor* factor) {
     printf("IN GENFACTOR about to nullcheck\n");
     if (factor->ident != NULL) {
-        printf("IDENT: %s\n", factor->ident);
         fprintf(yyout, "%s", factor->ident);
     }
     else if (factor->num != NULL) {
-        printf("NUM IN GENFACTOR: %d\n", *(factor->num));
         fprintf(yyout, "%d", *(factor->num));
     }
     else if (factor->bool != NULL) {
-        printf("BOOL IN GENFACTOR\n");
         fprintf(yyout, "%s", factor->bool);
     }
     else if (factor->expr != (struct Expression*)NULL) {
-        printf("EXPR IN FACTOR\n");
         fprintf(yyout, "(");
         genExpression(factor->expr);
         fprintf(yyout, ")");
@@ -270,9 +291,7 @@ void genFactor(struct Factor* factor) {
 }
 
 void genTerm(struct Term* term) {
-    printf("GENERATING FACTOR IN TERM\n");
     genFactor(term->factor1);
-    printf("COMPLETED GENERATED FACTOR\n");
     
     if (term->factor2 != (struct Factor*)NULL) {
         printf("FACTOR 2 NOW\n");
@@ -280,21 +299,15 @@ void genTerm(struct Term* term) {
         fprintf(yyout, " %s ", term->op2);
         genFactor(term->factor2);
     }
-    printf("COMPLETED GENERATING TERM\n");
 }
 
 void genSimpleExpression(struct SimpleExpression* simpleExpression) {
-    printf("GENERATING SIMPLE EXPRESSION\n");
     genTerm(simpleExpression->term1);
-
     if (simpleExpression->term2 != (struct Term*)NULL) {
         // TODO: output op3
         fprintf(yyout, " %s ", simpleExpression->op3);
-        printf("op: %s\n", simpleExpression->op3);
         genTerm(simpleExpression->term2); 
     }
-
-    printf("COMPLETE SIMPLE EXPR\n");
 }
 
 void genExpression(struct Expression* expression) {
@@ -372,16 +385,14 @@ void genStatement(struct Statement* statement) {
         genWriteInt(statement->writeInt);
     }
     else {
-        printf("ERROR with genStatement, all properties are NULL");
+        fprintf(stderr, "ERROR with genStatement, all properties are NULL");
     }
 }
 
 void genStatementSeq(struct StatementSequence* sequence) {
-    printf("generating statement seq\n\n");
     int i = 0;
     while (sequence != (struct StatementSequence*)NULL) {
         genStatement(sequence->stmt);
-        printf("finished statement %d\n", i++); // TODO: remove
         sequence = sequence->stmtSeq;
     }
 }
@@ -397,7 +408,6 @@ void genDecls(struct Declarations* decl) {
         decl = decl->decl;
     }
     fprintf(yyout, "\n");
-    printf("FINISHED GEN DECLS\n\n");
 }
 
 void genCode(struct Declarations* decl, struct StatementSequence* seq) {

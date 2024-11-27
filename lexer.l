@@ -43,15 +43,12 @@
                     }
                     yylval.num = malloc(sizeof(int));
                     *yylval.num = (int)result;
-                    printf("yylval.num: %d\n", *yylval.num);
                     return num;}
 false|true       {
-    // TODO: remove fprintf(yyout, "boollit\t\t%s\n", yytext); 
     yylval.boollit = malloc(strlen(yytext)); 
     strcpy(yylval.boollit, yytext); 
     return boollit;}
 [A-Z][A-Z0-9]*  {
-    // TODO: remove fprintf(yyout, "ident\t\t%s\n", yytext);
     yylval.sval = malloc(strlen(yytext)); 
     strcpy(yylval.sval, yytext); 
     return ident;
@@ -60,6 +57,6 @@ false|true       {
 "%"[^\n]*     {/* ignore comments */}
 [ \t\n]+        {/* ignore whitespace */}
 .            {yyerror("INVALID CHARACTER");}
-[^ \t\n]+        {yyerror(yytext);}
+[^ \t\n]+        {yyerror("INVALID TOKEN"); yyerror(yytext); }
 %%
 

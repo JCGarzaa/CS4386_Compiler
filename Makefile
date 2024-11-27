@@ -1,5 +1,5 @@
-main: lex.yy.c parser.tab.c structs.h
-	gcc lex.yy.c parser.tab.c structs.h -o main -lfl
+main: lex.yy.c parser.tab.c structs.h symbol_table.c symbol_table.h
+	gcc lex.yy.c parser.tab.c structs.h symbol_table.c -o main -lfl
 parser.tab.c: parser.y
 	bison -d parser.y
 lex.yy.c: lexer.l
