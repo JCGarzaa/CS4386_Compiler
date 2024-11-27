@@ -53,25 +53,25 @@ struct WriteInt {
 
 struct Expression {
     struct SimpleExpression* simpleExpr1;
-    // char* op4; // NOTE: maybe remove this
+    char* op4; // NOTE: maybe remove this
     struct SimpleExpression* simpleExpr2;
 };
 
 struct SimpleExpression {
     struct Term* term1;
-    // char* op3; // NOTE: maybe remove this
+    char* op3; // NOTE: maybe remove this
     struct Term* term2;
 };
 
 struct Term {
     struct Factor* factor1;
-    // char* op2; // NOTE: maybe remove this
+    char* op2; // NOTE: maybe remove this
     struct Factor* factor2;
 };
 
 struct Factor {
     char* ident;
-    long num;
+    int* num;
     char* bool;
     struct Expression* expr;
 };

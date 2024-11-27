@@ -5,22 +5,23 @@ program
 begn
    BIGGER := readInt ;
    SMALLER := readInt ;
-
    if SMALLER > BIGGER then
-      TEMP := SMALLER ;
-      TEMP1 := 2147483648 ;
-      SMALLER := BIGGER ;
-      BIGGER := TEMP ;
+       TEMP := SMALLER ;
+       TEMP1 := 2147483647 ;
+       SMALLER := BIGGER ;
+       BIGGER := TEMP ;
+   else
+       BIGGER := 12345 ;
+       SMALLER := TEMP ;
    end ;
-
    while SMALLER > 0 do
-      BIGGER := BIGGER - SMALLER ;
+         BIGGER := BIGGER - SMALLER ;
 
-      if SMALLER > BIGGER then
-         TEMP := SMALLER ;
-         SMALLER := BIGGER ;
-         BIGGER := TEMP ;
-      end ;
-   end ;
-   writeInt BIGGER ;
+         if SMALLER > BIGGER then
+            TEMP := SMALLER ;
+            SMALLER := BIGGER ;
+            BIGGER := TEMP ;
+         end ;
+    end ;
+    writeInt BIGGER ;
 end
