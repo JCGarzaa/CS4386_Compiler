@@ -33,15 +33,8 @@ int check_initialized(const char* name) {
 void initialize_variable(const char* name) {
     SymbolTableEntry *entry = find_variable(name);
     if (!entry) {
-        printf("ERROR: Cannot assign to undeclared variable '%s'\n", name);
+        fprintf(stderr, "ERROR: Cannot assign to undeclared variable '%s'\n", name);
         return;
     }
-    // if (strcmp(entry->type, type) != 0 ) {
-    //     printf("ERROR: Type mismatch. Variable 's' is of type '%s', cannot assign '%s'\n", 
-    //             name,
-    //             entry->type, // TODO: change to entry->type == TYPE_INT ? "int":"bool"
-    //             type);  // TODO: change to type == TYPE_INT ? "int" : "bool"
-    //     return;
-    // }
     entry->initialized = 1;
 }

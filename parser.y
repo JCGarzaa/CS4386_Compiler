@@ -94,9 +94,7 @@ declarations:
                     yyerror("ERROR: Variable already declared.");
                     exit(EXIT_FAILURE);
                 }
-                else {
-                    add_variable($2, $4, 0);
-                }
+                add_variable($2, $4, 0);
                 struct Declarations* ptr = malloc(sizeof(struct Declarations));
                 ptr->ident = $2;
                 ptr->type = $4;
@@ -117,7 +115,6 @@ type:
 statementSequence:
                  statement SC statementSequence { struct StatementSequence* ptr = malloc(sizeof(struct StatementSequence));
                                                   ptr->stmt = $1;
-                                                  printf(ptr->stmt);
                                                   ptr->stmtSeq = $3;
                                                   $$ = ptr; }
                  | /* empty */ { $$ = (struct StatementSequence*)NULL; }
@@ -170,11 +167,8 @@ assignment:
 ifStatement:
            IF expression THEN statementSequence elseClause END {
              struct IfStatement* ptr = malloc(sizeof(struct IfStatement));
-             printf("ifStatement: \n"); // FIX: REMOVE
              ptr->expr = $2;
-             printf("\texpr in if: %s\n", ptr->expr);  // FIX: REMOVE
              ptr->stmtSeq = $4;
-             printf("\tstmtSeq: %s\n", ptr->stmtSeq);
              ptr->elseClause = $5;
              $$ = ptr; }
            ;
@@ -203,13 +197,13 @@ writeInt:
 expression:
           simpleExpression { struct Expression* ptr = malloc(sizeof(struct Expression));
                              ptr->simpleExpr1 = $1;
-                             ptr->op4 = (char*)NULL; // TODO: MAYBE CHANGE THIS
+                             ptr->op4 = (char*)NULL;
                              ptr->simpleExpr2 = (struct SimpleExpression*)NULL;
                              $$ = ptr; }
           | simpleExpression OP4 simpleExpression { 
                 struct Expression* ptr = malloc(sizeof(struct Expression));
                 ptr->simpleExpr1 = $1;
-                ptr->op4 = $2; // TODO: MAYBE CHANGE THIS
+                ptr->op4 = $2;
                 ptr->simpleExpr2 = $3;
                 $$ = ptr; }
           ;
@@ -217,12 +211,12 @@ expression:
 simpleExpression:
                 term OP3 term { struct SimpleExpression* ptr = malloc(sizeof(struct SimpleExpression));
                                 ptr->term1 = $1;
-                                ptr->op3 = $2; // TODO: MAYBE CHANGE THIS
+                                ptr->op3 = $2;
                                 ptr->term2 = $3;
                                 $$ = ptr; }
                 | term { struct SimpleExpression* ptr = malloc(sizeof(struct SimpleExpression));
                          ptr->term1 = $1;
-                         ptr->op3 = (char*)NULL; // TODO: MAYBE CHANGE THIS
+                         ptr->op3 = (char*)NULL;
                          ptr->term2 = (struct Term*)NULL;
                          $$ = ptr; }
                 ;
@@ -230,18 +224,25 @@ simpleExpression:
 term:
     factor OP2 factor { struct Term* ptr = malloc(sizeof(struct Term));
                         ptr->factor1 = $1;
-                        ptr->op2 = $2; // TODO: MAYBE CHANGE THIS
-                        ptr->factor2 = $3; //TODO: check this
+                        ptr->op2 = $2;
+                        ptr->factor2 = $3;
                         $$ = ptr; }
     | factor { struct Term* ptr = malloc(sizeof(struct Term));
                ptr->factor1 = $1;
-               ptr->op2 = (char*)NULL; // TODO: MAYBE CHANGE THIS
+               ptr->op2 = (char*)NULL;
                ptr->factor2 = (struct Factor*)NULL;
                $$ = ptr;}
     ;
 
 factor:
-      ident { struct Factor* ptr = malloc(sizeof(struct Factor));
+      ident { 
+            SymbolTableEntry *entry = find_variable($1);
+            if (!entry) {
+                fprintf(stderr, "ERROR: variable '%s' not declared yet\n", $1);
+                yyerror("ERROR: variable not declared yet");
+                exit(EXIT_FAILURE);
+            }
+            struct Factor* ptr = malloc(sizeof(struct Factor));
               ptr->ident = (char*)$1;
               $$ = ptr;}
       | num { struct Factor* ptr = malloc(sizeof(struct Factor));
@@ -262,7 +263,7 @@ void yyerror(char *s) {
 
 int main() {
     yyin = fopen("input.txt", "r");
-    yyout = fopen("output.txt", "w");
+    yyout = fopen("output.c", "w");
     int parseResult = yyparse();
     if (parseResult == 0) printf("---SUCCESS---\n");
     else printf("---FAILURE---\n");
@@ -270,7 +271,6 @@ int main() {
 }
 
 void genFactor(struct Factor* factor) {
-    printf("IN GENFACTOR about to nullcheck\n");
     if (factor->ident != NULL) {
         fprintf(yyout, "%s", factor->ident);
     }
@@ -285,17 +285,12 @@ void genFactor(struct Factor* factor) {
         genExpression(factor->expr);
         fprintf(yyout, ")");
     }
-    else {
-        printf("ERROR in genFactor, all properties are NULL");
-    }
 }
 
 void genTerm(struct Term* term) {
     genFactor(term->factor1);
     
     if (term->factor2 != (struct Factor*)NULL) {
-        printf("FACTOR 2 NOW\n");
-        // TODO: output OP2
         fprintf(yyout, " %s ", term->op2);
         genFactor(term->factor2);
     }
@@ -304,25 +299,20 @@ void genTerm(struct Term* term) {
 void genSimpleExpression(struct SimpleExpression* simpleExpression) {
     genTerm(simpleExpression->term1);
     if (simpleExpression->term2 != (struct Term*)NULL) {
-        // TODO: output op3
         fprintf(yyout, " %s ", simpleExpression->op3);
         genTerm(simpleExpression->term2); 
     }
 }
 
 void genExpression(struct Expression* expression) {
-    // TODO: finish this and maybe do something with yytext for op?
     genSimpleExpression(expression->simpleExpr1);
-
     if (expression->simpleExpr2 != (struct SimpleExpression*)NULL) {
-        // TODO: output OP4
         fprintf(yyout, " %s ", expression->op4);
         genSimpleExpression(expression->simpleExpr2);
     }
 }
 
 void genWriteInt(struct WriteInt* writeInt) {
-    // TODO: evaluate expression and output to console with newline after
     fprintf(yyout, "printf(\"%%d\\n\", ");
     genExpression(writeInt->expr);
     fprintf(yyout, ");\n");
@@ -330,14 +320,11 @@ void genWriteInt(struct WriteInt* writeInt) {
 
 void genAssignment(struct Assignment* assignment) {
     if (assignment->expr != (struct Expression*)NULL) {
-        // printf("IDENTI %s = \n", assignment->ident);
-        // printf("WOID%s = \n", assignment->expr->simpleExpr1->term1->factor1->ident);
-        // printf("GENASNum%s = \n", assignment->expr->simpleExpr1->term1->factor1->num);
         fprintf(yyout, "%s = ", assignment->ident);
         genExpression(assignment->expr);
     }
     else {
-        fprintf(yyout, "scanf(\"%%d\", %s)", assignment->ident);
+        fprintf(yyout, "scanf(\"%%d\", &%s)", assignment->ident);
     }
     fprintf(yyout, ";\n");
 }
@@ -347,8 +334,7 @@ void genIfStatement(struct IfStatement* ifStatement) {
     genExpression(ifStatement->expr);
     fprintf(yyout, ") {\n");
     genStatementSeq(ifStatement->stmtSeq);
-    fprintf(yyout, "}\t// finished if\n");
-    
+    fprintf(yyout, "}\n");
     if (ifStatement->elseClause != (struct ElseClause*)NULL) {
         genElseClause(ifStatement->elseClause);
     }
@@ -359,7 +345,7 @@ void genElseClause(struct ElseClause* elseClause) {
     if (elseClause->stmtSeq != (struct StatementSequence*)NULL) {
         genStatementSeq(elseClause->stmtSeq);
     }
-    fprintf(yyout, "}\t// finished else\n"); // TODO: remove comment
+    fprintf(yyout, "}\n");
 }
 
 void genWhileStatement(struct WhileStatement* whileStatement) {
@@ -367,11 +353,10 @@ void genWhileStatement(struct WhileStatement* whileStatement) {
     genExpression(whileStatement->expr);
     fprintf(yyout, ") {\n");
     genStatementSeq(whileStatement->stmtSeq);
-    fprintf(yyout, "}\t// finished while\n"); // TODO: remove comment
+    fprintf(yyout, "}\n");
 }
 
 void genStatement(struct Statement* statement) {
-    printf("generating statement\n");
     if (statement->assignment != (struct Assignment*)NULL) {
         genAssignment(statement->assignment);
     }

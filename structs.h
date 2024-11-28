@@ -10,12 +10,6 @@ struct Declarations {
     struct Declarations* decl;
 };
 
-// TODO: change type to enum
-// enum Type {
-//     TYPE_INT,
-//     TYPE_BOOL
-// }
-
 struct Type {
     char* type;
 };
